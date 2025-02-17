@@ -40,9 +40,9 @@ function promofull_file_to_dataframe(file_path::String)::DataFrame
             "GiftsItems" => gifts_items
         )
         for element in eachelement(item_node)
-            if element.name in ["PromotionId", "AllowMultipleDiscounts", "RewardType", "MinNoOfItemOfered", "AdditionalIsCoupon", "AdditionalGiftCount", "AdditionalIsTotal", "AdditionalIsActive", "DiscountRate","DiscountType"]
+            if element.name in ["PromotionId", "AllowMultipleDiscounts", "RewardType", "MinNoOfItemOfered", "AdditionalIsCoupon", "AdditionalGiftCount", "AdditionalIsTotal", "AdditionalIsActive","DiscountType"]
                 row[element.name] = parse(Int64, element.content)
-            elseif element.name in ["PromotionDescription", "PromotionUpdateDate", "PromotionStartDate", "PromotionStartHour", "PromotionEndDate", "PromotionEndHour","DiscountedPrice","DiscountedPricePerMida","IsWeightedPromo","AdditionalRestrictions","Remark","Remarks","MinQty","MaxQty","MinAmount","MinPurchaseAmnt","MaxAmount","MAXQTY"]
+            elseif element.name in ["PromotionDescription", "PromotionUpdateDate", "PromotionStartDate", "PromotionStartHour", "PromotionEndDate", "PromotionEndHour","DiscountedPrice", "DiscountRate","DiscountedPricePerMida","IsWeightedPromo","AdditionalRestrictions","Remark","Remarks","MinQty","MaxQty","MinAmount","MinPurchaseAmnt","MaxAmount","MAXQTY"]
                 row[element.name] = element.content
             elseif element.name == "PromotionItems"
                 # resize promotion_items

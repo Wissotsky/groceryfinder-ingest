@@ -2,3 +2,4 @@ protobufs_folder/storeitems_pb.jl
 *.zst
 GlobalRun*
 urls.txt
+sandbox.ipynb
