@@ -18,8 +18,10 @@ using Serialization
 
 function is_less_for_cerberus_file_time(x,y)
     fileTimeStringX = x["ftime"]
+    if fileTimeStringX == "" fileTimeStringX = "01/01/1970 00:00" end
     fileDateTimeX = DateTime(fileTimeStringX,dateformat"mm/dd/yyyy HH:MM")
     fileTimeStringY = y["ftime"]
+    if fileTimeStringY == "" fileTimeStringY = "01/01/1970 00:00" end
     fileDateTimeY = DateTime(fileTimeStringY,dateformat"mm/dd/yyyy HH:MM")
     return fileDateTimeX < fileDateTimeY
 end
@@ -51,15 +53,27 @@ function fetchStoreData(STORE_NAME::String, CERBERUS_PASSWORD::String, GLOBAL_FO
     # Authenticate with cerberus
     csrf_token = cerberus_auth_to_token(STORE_NAME,CERBERUS_PASSWORD)
 
-    # fetch url for stores file
-    resp = HTTP.post("https://url.publishedprices.co.il/file/json/dir"; query=Dict("iDisplayLength" => "100000", "sSearch" => "Stores", "csrftoken" => csrf_token))
-    body = JSON.parse(String(resp.body))
-    # sort by file recency. from most recent to least recent
-    json_file_list_sorted_by_recency = sort(body["aaData"],lt=is_less_for_cerberus_file_time,rev=true)
-    # filter out files with NULL in their names
-    filter!(x -> !occursin("NULL",x["name"]),json_file_list_sorted_by_recency)
-    store_list_xml_url = "https://url.publishedprices.co.il/file/d/$(json_file_list_sorted_by_recency[1]["name"])?dm=0"
-    println("Fetching store list from $store_list_xml_url")
+    if STORE_NAME == "yuda_ho"
+        # fetch url for stores file
+        resp = HTTP.post("https://url.publishedprices.co.il/file/json/dir"; query=Dict("iDisplayLength" => "100000", "sSearch" => "Stores", "csrftoken" => csrf_token, "cd" => "/Yuda"))
+        body = JSON.parse(String(resp.body))
+        # sort by file recency. from most recent to least recent
+        json_file_list_sorted_by_recency = sort(body["aaData"],lt=is_less_for_cerberus_file_time,rev=true)
+        # filter out files with NULL in their names
+        filter!(x -> !occursin("NULL",x["name"]),json_file_list_sorted_by_recency)
+        store_list_xml_url = "https://url.publishedprices.co.il/file/d/Yuda/$(json_file_list_sorted_by_recency[1]["name"])?dm=0"
+        println("Fetching store list from $store_list_xml_url")
+    else
+        # fetch url for stores file
+        resp = HTTP.post("https://url.publishedprices.co.il/file/json/dir"; query=Dict("iDisplayLength" => "100000", "sSearch" => "Stores", "csrftoken" => csrf_token))
+        body = JSON.parse(String(resp.body))
+        # sort by file recency. from most recent to least recent
+        json_file_list_sorted_by_recency = sort(body["aaData"],lt=is_less_for_cerberus_file_time,rev=true)
+        # filter out files with NULL in their names
+        filter!(x -> !occursin("NULL",x["name"]),json_file_list_sorted_by_recency)
+        store_list_xml_url = "https://url.publishedprices.co.il/file/d/$(json_file_list_sorted_by_recency[1]["name"])?dm=0"
+        println("Fetching store list from $store_list_xml_url")
+    end
 
     # fetch stores file
     r = HTTP.get(store_list_xml_url)
@@ -72,9 +86,9 @@ function fetchStoreData(STORE_NAME::String, CERBERUS_PASSWORD::String, GLOBAL_FO
     cftpsid_cookie = HTTP.Cookies.stringify(cookies[1])
 
     # parse into stores dataframe
-    chainId = findfirst("//ChainId",xml.root).content
+    chainId = findfirst("//ChainId | //ChainID",xml.root).content
 
-    storeid_nodes = findall("//StoreId",xml.root)
+    storeid_nodes = findall("//StoreId | //StoreID",xml.root)
     storeIds = [parse(Int64,(i.content * chainId)) for i in storeid_nodes]
     storename_nodes = findall("//StoreName",xml.root)
     storeNames = [i.content for i in storename_nodes]

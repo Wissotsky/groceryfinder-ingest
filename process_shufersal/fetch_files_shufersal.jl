@@ -20,7 +20,7 @@ using URIs
 
 
 
-function fetchFiles(GLOBAL_FOLDER::String)
+function fetchFiles(GLOBAL_FOLDER::String,path_mapping_dict::Dict)
     STORE_NAME = "Shufersal"
     #GLOBAL_FOLDER = "scratch_folder"
 
@@ -61,9 +61,31 @@ function fetchFiles(GLOBAL_FOLDER::String)
     filter!(x -> in(parse(Int64,match(r"-(\d*)-",x).captures[1]),allowed_store_ids),file_links_list)
 
     output_folder_name = "$STORE_NAME-output"
+    mkpath(joinpath(GLOBAL_FOLDER,output_folder_name))
+    #origin_path = pwd()
+    #cd(joinpath(GLOBAL_FOLDER,output_folder_name))
+    file_links_list_to_fetch = []
+
+    for url in file_links_list
+        filename = URIs.splitpath(parse(URI, url))[2]
+        local_path = joinpath(output_folder_name,filename)
+        target_path = joinpath(GLOBAL_FOLDER,local_path)
+        cache_path = get(path_mapping_dict,local_path,missing)
+        if ismissing(cache_path)
+            push!(file_links_list_to_fetch,url)
+        else
+            if !ispath(target_path)
+                symlink(abspath(cache_path),target_path)
+                @info "Using cached file: $filename for $STORE_NAME"
+            end
+        end
+    end
+
+    println("file_links_list_to_fetch length: ",length(file_links_list_to_fetch))
+
     # write to txt file
     open("urls.txt", "w") do io
-        for url in file_links_list
+        for url in file_links_list_to_fetch
             println(io, url)
             println(io, "   out=$GLOBAL_FOLDER/$output_folder_name/$(URIs.splitpath(parse(URI, url))[2])")
         end

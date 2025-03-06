@@ -34,33 +34,52 @@ using ProtoBuf
 protojl("storeitems.proto", ".", "protobufs_folder")
 include("protobufs_folder/storeitems_pb.jl")
 
+# Find the files from the latest run and use them as a cache for the current run
+# Prevents redownloading of the same files
+
+run_folders = filter(x -> occursin(r"GlobalRun",x),readdir("."))
+if length(run_folders) == 0
+    @info "No previous runs found, cache is empty"
+    path_mapping_dict = Dict()
+else
+    file_paths = ((run_folders .|> x -> readdir(x,join=true) |> filter(x -> occursin(r"-output",x))) |> splat(vcat) .|> x -> readdir(x,join=true)) |> splat(vcat)
+    path_mapping_dict = Dict((file_paths .|> splitpath .|> x -> last(x,2) |> joinpath) .=> file_paths)
+end
 
 RUN_TIME = Dates.format(Dates.now(),"yyyy-mm-ddTHH-MM-SS")
 RUN_FOLDER = "GlobalRun$(RUN_TIME)"
 mkdir(RUN_FOLDER)
 
+exception_logfile_io = open(joinpath(RUN_FOLDER,"exceptions.log"),"w+")
+
 try
     ShufersalStoreData.fetchStoreData(RUN_FOLDER)
-    ShufersalFetchFiles.fetchFiles(RUN_FOLDER)
+    ShufersalFetchFiles.fetchFiles(RUN_FOLDER,path_mapping_dict)
     ShufersalProcessFiles.processFiles(RUN_FOLDER)
 catch e
     println("Error in Shufersal")
-    println(e)
+    bt = catch_backtrace()
+    msg = sprint(showerror, e, bt)
+    println(exception_logfile_io,first(msg,1024*16))
 end
 
 binaprojects_stores = ["kingstore","maayan2000","goodpharm","zolvebegadol","supersapir","citymarketgivatayim","citymarketkiryatgat","superbareket","ktshivuk","shuk-hayir","shefabirkathashem"]
 for i in binaprojects_stores
     try
         BinaprojectsStoreData.fetchStoreData(i,RUN_FOLDER)
-        BinaprojectsFetchFiles.fetchFiles(i,RUN_FOLDER)
+        BinaprojectsFetchFiles.fetchFiles(i,RUN_FOLDER,path_mapping_dict)
         BinaprojectsProcessFiles.processFiles(i,RUN_FOLDER)
     catch e
         println("Error in $i")
-        println(e)
+        bt = catch_backtrace()
+        msg = sprint(showerror, e, bt)
+        println(exception_logfile_io,first(msg,1024*16))
     end
 end
 
+
 cerberus_stores_with_passwords = [
+    #["SuperCofixApp", ""] # Doesnt publish stores xml data
     ["doralon", ""],
     ["TivTaam", ""],
     ["yohananof", ""],
@@ -72,21 +91,24 @@ cerberus_stores_with_passwords = [
     ["yuda_ho","Yud@147"],
     ["freshmarket", ""],
     ["Keshet", ""],
-    ["RamiLevi", ""],
-    ["SuperCofixApp", ""]
+    ["RamiLevi", ""]
 ]
 
 for i in cerberus_stores_with_passwords
     try
         CerberusStoreData.fetchStoreData(i[1],i[2],RUN_FOLDER)
-        CerberusFetchFiles.fetchFiles(i[1],i[2],RUN_FOLDER)
+        CerberusFetchFiles.fetchFiles(i[1],i[2],RUN_FOLDER,path_mapping_dict)
         CerberusProcessFiles.processFiles(i[1],i[2],RUN_FOLDER)
     catch e
         println("Error in $i")
-        println(e)
+        bt = catch_backtrace()
+        msg = sprint(showerror, e, bt)
+        println(exception_logfile_io,first(msg,1024*16))
     end
 end
 
+flush(exception_logfile_io)
+close(exception_logfile_io)
 
 # Unimplemented stores
 
@@ -160,11 +182,11 @@ g = SimpleGraph(n)
 
 # Create dictionaries for itemid and name
 itemid_dict = Dict{Any, Int}()
-name_dict = Dict{Any, Int}()
+#name_dict = Dict{Any, Int}()
 
 for i in 1:n
     itemid = prices_dataframe[i, :ItemCode]
-    name = prices_dataframe[i, :ManufacturerItemDescription] * string(prices_dataframe[i, :ItemName]) * string(prices_dataframe[i, :ItemNm])
+    #name = prices_dataframe[i, :ManufacturerItemDescription] * string(prices_dataframe[i, :ItemName]) * string(prices_dataframe[i, :ItemNm])
 
     # If the itemid is already in the dictionary, add an edge
     if haskey(itemid_dict, itemid)
@@ -173,10 +195,10 @@ for i in 1:n
     itemid_dict[itemid] = i
 
     # If the name is already in the dictionary, add an edge
-    if haskey(name_dict, name)
-        add_edge!(g, name_dict[name], i)
-    end
-    name_dict[name] = i
+    #if haskey(name_dict, name)
+    #    add_edge!(g, name_dict[name], i)
+    #end
+    #name_dict[name] = i
 end
 
 components = connected_components(g) #85575
